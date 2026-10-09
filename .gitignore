@@ -35,5 +35,4 @@ npm-debug.log*
 .DS_Store
 *.pem
 
-# Firebase CLI cache
-.firebase/
+.env*
