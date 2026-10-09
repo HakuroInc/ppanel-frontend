@@ -1,0 +1,59 @@
+name: Deploy user frontend
+
+# Every push to the production branch builds apps/user and publishes it to
+# Firebase Hosting (project panel-6b256, served at xb.91917878.xyz).
+# Authentication is keyless: GitHub's OIDC token is exchanged through the
+# workload identity pool "github" for the gha-hosting-deploy service account,
+# and the pool only accepts this repository's production branch.
+on:
+  push:
+    branches: [production]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: deploy-user-firebase
+  cancel-in-progress: false
+
+env:
+  VITE_API_BASE_URL: https://pp-api.91917878.xyz
+  VITE_API_PREFIX: ""
+  FIREBASE_PROJECT: panel-6b256
+
+jobs:
+  deploy:
+    name: Build and deploy
+    if: github.ref == 'refs/heads/production'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.1
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      # vite directly rather than turbo: turbo's strict env mode would drop
+      # the VITE_* variables above.
+      - name: Build user app
+        working-directory: apps/user
+        run: bunx vite build
+
+      - uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: projects/48751704890/locations/global/workloadIdentityPools/github/providers/ppanel-frontend
+          service_account: gha-hosting-deploy@panel-6b256.iam.gserviceaccount.com
+
+      - name: Deploy to Firebase Hosting
+        env:
+          GOOGLE_CLOUD_QUOTA_PROJECT: ${{ env.FIREBASE_PROJECT }}
+        run: >-
+          bunx firebase-tools@15 deploy --only hosting
+          --project "$FIREBASE_PROJECT" --non-interactive
+          --message "${GITHUB_SHA::8}"
