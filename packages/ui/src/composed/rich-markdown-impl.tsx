@@ -9,11 +9,16 @@ import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { oneDark } from "react-syntax-highlighter/dist/esm/styles/prism";
 import rehypeKatex from "rehype-katex";
 import rehypeRaw from "rehype-raw";
+import rehypeSanitize from "rehype-sanitize";
 import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
 import remarkToc from "remark-toc";
 import type { MarkdownProps } from "./markdown";
-import { appUrlTransform, markdownComponents } from "./markdown-elements";
+import {
+  appUrlTransform,
+  markdownComponents,
+  markdownSanitizeSchema,
+} from "./markdown-elements";
 
 interface CodeBlockProps {
   className?: string;
@@ -88,7 +93,11 @@ export default function RichMarkdownImpl({
           },
           ...components,
         }}
-        rehypePlugins={[rehypeRaw, rehypeKatex]}
+        rehypePlugins={[
+          rehypeRaw,
+          [rehypeSanitize, markdownSanitizeSchema],
+          rehypeKatex,
+        ]}
         remarkPlugins={[remarkGfm, remarkToc, remarkMath]}
         urlTransform={appUrlTransform}
       >

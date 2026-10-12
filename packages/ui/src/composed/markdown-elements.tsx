@@ -2,9 +2,28 @@
 
 import { cn } from "@workspace/ui/lib/utils";
 import { type Components, defaultUrlTransform } from "react-markdown";
+import { defaultSchema, type Options as SanitizeSchema } from "rehype-sanitize";
 
-const APP_DEEPLINK_SCHEME =
-  /^(clash|clashmeta|shadowrocket|surge|surge3|sing-box|stash|loon|surfboard|hiddify|egern|v2rayng|quantumult-x):/i;
+const APP_DEEPLINK_PROTOCOLS = [
+  "clash",
+  "clashmeta",
+  "shadowrocket",
+  "surge",
+  "surge3",
+  "sing-box",
+  "stash",
+  "loon",
+  "surfboard",
+  "hiddify",
+  "egern",
+  "v2rayng",
+  "quantumult-x",
+];
+
+const APP_DEEPLINK_SCHEME = new RegExp(
+  `^(${APP_DEEPLINK_PROTOCOLS.join("|")}):`,
+  "i"
+);
 
 // react-markdown strips unknown URL schemes by default, which would break the
 // client one-click-import deep links. Everything else keeps the default
@@ -12,6 +31,28 @@ const APP_DEEPLINK_SCHEME =
 export function appUrlTransform(url: string): string {
   return APP_DEEPLINK_SCHEME.test(url) ? url : defaultUrlTransform(url);
 }
+
+// Raw HTML in Markdown comes from admins and a third-party CDN, so it is
+// untrusted. Start from the GitHub-style default schema and add only what the
+// renderers rely on: language and KaTeX math classes on code, and the app
+// deep-link schemes in href. Script, iframe, object, embed and style are
+// removed with their content. Event handler attributes, srcdoc and style
+// attributes are not allowed, and javascript: or data: links are rejected by
+// the protocol allowlists. <source> is dropped because its srcset is not
+// checked against the protocol allowlist; the <img> fallback still renders.
+export const markdownSanitizeSchema: SanitizeSchema = {
+  ...defaultSchema,
+  attributes: {
+    ...defaultSchema.attributes,
+    code: [["className", /^language-./, "math-inline", "math-display"]],
+  },
+  protocols: {
+    ...defaultSchema.protocols,
+    href: [...(defaultSchema.protocols?.href ?? []), ...APP_DEEPLINK_PROTOCOLS],
+  },
+  strip: [...(defaultSchema.strip ?? []), "style", "iframe", "object", "embed"],
+  tagNames: (defaultSchema.tagNames ?? []).filter((tag) => tag !== "source"),
+};
 
 export const markdownComponents: Components = {
   h1: ({ node, className, ...props }) => (
